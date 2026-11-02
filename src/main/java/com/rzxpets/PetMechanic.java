@@ -96,6 +96,51 @@ public abstract class PetMechanic {
         return false;
     }
 
+    public static org.bukkit.Particle resolveParticle(String... candidateNames) {
+        for (String candidate : candidateNames) {
+            if (candidate == null || candidate.isEmpty()) continue;
+            try {
+                return org.bukkit.Particle.valueOf(candidate.toUpperCase());
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    public static void spawnSafeParticle(org.bukkit.World world, String particleName, org.bukkit.Location loc, int count, double ox, double oy, double oz, double extra) {
+        if (world == null || loc == null) return;
+        org.bukkit.Particle p = null;
+        if ("VILLAGER_HAPPY".equalsIgnoreCase(particleName) || "HAPPY_VILLAGER".equalsIgnoreCase(particleName)) {
+            p = resolveParticle("HAPPY_VILLAGER", "VILLAGER_HAPPY");
+        } else {
+            p = resolveParticle(particleName);
+        }
+        if (p != null) {
+            try {
+                world.spawnParticle(p, loc, count, ox, oy, oz, extra);
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    public static double getMaxHealth(org.bukkit.entity.LivingEntity entity) {
+        if (entity == null) return 20.0;
+        try {
+            org.bukkit.attribute.Attribute attr = org.bukkit.attribute.Attribute.valueOf("GENERIC_MAX_HEALTH");
+            org.bukkit.attribute.AttributeInstance inst = entity.getAttribute(attr);
+            if (inst != null) return inst.getValue();
+        } catch (Throwable t1) {
+            try {
+                org.bukkit.attribute.Attribute attr = org.bukkit.attribute.Attribute.valueOf("MAX_HEALTH");
+                org.bukkit.attribute.AttributeInstance inst = entity.getAttribute(attr);
+                if (inst != null) return inst.getValue();
+            } catch (Throwable t2) {}
+        }
+        try {
+            return entity.getMaxHealth();
+        } catch (Throwable t3) {
+            return 20.0;
+        }
+    }
+
     public int getMinLevel() {
         return minLevel;
     }
@@ -703,7 +748,7 @@ public abstract class PetMechanic {
                 
                 if (handleCustomAction(player, placeholders)) return;
 
-                player.getWorld().spawnParticle(org.bukkit.Particle.valueOf("BARRIER"), player.getLocation().add(0, 1, 0), 3, 0.2, 0.2, 0.2, 0.0);
+                spawnSafeParticle(player.getWorld(), "BARRIER", player.getLocation().add(0, 1, 0), 3, 0.2, 0.2, 0.2, 0.0);
                 player.sendMessage(PlaceholderHook.color(getName() + " &7» &fYour companion blocked &a" + (int)(pct * 100) + "% &fof incoming damage!"));
             }
         }
@@ -747,9 +792,9 @@ public abstract class PetMechanic {
             if (Math.random() < chance) {
                 double pct = Math.min(0.20, basePercent + (data.getLevel() * percentModifier));
                 double healAmount = damageDealt * pct;
-                double newHealth = Math.min(player.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH).getValue(), player.getHealth() + healAmount);
+                double newHealth = Math.min(getMaxHealth(player), player.getHealth() + healAmount);
                 player.setHealth(newHealth);
-                player.getWorld().spawnParticle(org.bukkit.Particle.valueOf("HEART"), player.getLocation().add(0, 1.5, 0), 3, 0.2, 0.2, 0.2, 0.0);
+                spawnSafeParticle(player.getWorld(), "HEART", player.getLocation().add(0, 1.5, 0), 3, 0.2, 0.2, 0.2, 0.0);
 
                 java.util.Map<String, String> placeholders = new java.util.HashMap<>();
                 placeholders.put("%chance%", String.format("%.1f", chance * 100));
@@ -817,7 +862,7 @@ public abstract class PetMechanic {
                 for (ItemStack drop : event.getBlock().getDrops(player.getInventory().getItemInMainHand())) {
                     event.getBlock().getWorld().dropItemNaturally(event.getBlock().getLocation(), drop);
                 }
-                player.getWorld().spawnParticle(org.bukkit.Particle.valueOf("VILLAGER_HAPPY"), event.getBlock().getLocation().add(0.5, 0.5, 0.5), 5, 0.2, 0.2, 0.2, 0.0);
+                spawnSafeParticle(player.getWorld(), "VILLAGER_HAPPY", event.getBlock().getLocation().add(0.5, 0.5, 0.5), 5, 0.2, 0.2, 0.2, 0.0);
 
                 java.util.Map<String, String> placeholders = new java.util.HashMap<>();
                 placeholders.put("%chance%", String.format("%.1f", chance * 100));
@@ -938,12 +983,12 @@ public abstract class PetMechanic {
                 if (handleCustomAction(player, placeholders)) {
                     // Heal player and allies silently
                     healEntity(player, amount);
-                    player.getWorld().spawnParticle(org.bukkit.Particle.valueOf("HEART"), player.getLocation().add(0, 1.0, 0), 4, 0.3, 0.3, 0.3, 0.05);
+                    spawnSafeParticle(player.getWorld(), "HEART", player.getLocation().add(0, 1.0, 0), 4, 0.3, 0.3, 0.3, 0.05);
                     for (Entity entity : player.getNearbyEntities(rad, rad, rad)) {
                         if (entity instanceof Player) {
                             Player p = (Player) entity;
                             healEntity(p, amount);
-                            p.getWorld().spawnParticle(org.bukkit.Particle.valueOf("HEART"), p.getLocation().add(0, 1.0, 0), 4, 0.3, 0.3, 0.3, 0.05);
+                            spawnSafeParticle(p.getWorld(), "HEART", p.getLocation().add(0, 1.0, 0), 4, 0.3, 0.3, 0.3, 0.05);
                         }
                     }
                     return;
@@ -951,7 +996,7 @@ public abstract class PetMechanic {
                 
                 // Heal player
                 healEntity(player, amount);
-                player.getWorld().spawnParticle(org.bukkit.Particle.valueOf("HEART"), player.getLocation().add(0, 1.0, 0), 4, 0.3, 0.3, 0.3, 0.05);
+                spawnSafeParticle(player.getWorld(), "HEART", player.getLocation().add(0, 1.0, 0), 4, 0.3, 0.3, 0.3, 0.05);
                 player.sendMessage(PlaceholderHook.color(getName() + " &7» &fYour companion healed you for &a" + String.format("%.1f", amount) + " HP!"));
                 
                 // Heal nearby allies/players
@@ -959,7 +1004,7 @@ public abstract class PetMechanic {
                     if (entity instanceof Player) {
                         Player p = (Player) entity;
                         healEntity(p, amount);
-                        p.getWorld().spawnParticle(org.bukkit.Particle.valueOf("HEART"), p.getLocation().add(0, 1.0, 0), 4, 0.3, 0.3, 0.3, 0.05);
+                        spawnSafeParticle(p.getWorld(), "HEART", p.getLocation().add(0, 1.0, 0), 4, 0.3, 0.3, 0.3, 0.05);
                         p.sendMessage(PlaceholderHook.color(getName() + " &7» &fYou were healed for &a" + String.format("%.1f", amount) + " HP &fby " + player.getName() + "'s companion!"));
                     }
                 }
@@ -967,7 +1012,7 @@ public abstract class PetMechanic {
         }
 
         private void healEntity(Player p, double amount) {
-            double max = p.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH).getValue();
+            double max = getMaxHealth(p);
             p.setHealth(Math.min(max, p.getHealth() + amount));
         }
 

@@ -11,6 +11,7 @@ public class PlayerData {
     private String activePet;
     private int playtimeSeconds;
     private int afkPlaytimeSeconds;
+    private int extraStorageLimit;
 
     public PlayerData(UUID uuid) {
         this.uuid = uuid;
@@ -18,6 +19,7 @@ public class PlayerData {
         this.activePet = null;
         this.playtimeSeconds = 0;
         this.afkPlaytimeSeconds = 0;
+        this.extraStorageLimit = 0;
     }
 
     public UUID getUuid() {
@@ -70,20 +72,28 @@ public class PlayerData {
         this.afkPlaytimeSeconds = afkPlaytimeSeconds;
     }
 
+    public int getExtraStorageLimit() {
+        return extraStorageLimit;
+    }
+
+    public void setExtraStorageLimit(int extraStorageLimit) {
+        this.extraStorageLimit = extraStorageLimit;
+    }
+
     public int getMaxLimit(Player player) {
-        for (int i = 100; i >= 1; i--) {
-            if (player.hasPermission("rzxpets.limit." + i)) {
-                return i;
+        int maxPermLimit = 0;
+        if (player != null) {
+            for (int i = 100; i >= 1; i--) {
+                if (player.hasPermission("rzxpets.limit." + i)) {
+                    maxPermLimit = i;
+                    break;
+                }
             }
         }
-        try {
-            org.bukkit.plugin.Plugin p = org.bukkit.Bukkit.getPluginManager().getPlugin("RZXPets");
-            if (p != null) {
-                return p.getConfig().getInt("storage.default-limit", 1);
-            }
-        } catch (Exception e) {
-            // Ignored
+        int defaultLimit = 1;
+        if (RZXPets.getInstance() != null) {
+            defaultLimit = RZXPets.getInstance().getConfig().getInt("storage.default-limit", 1);
         }
-        return 1;
+        return Math.max(defaultLimit, Math.max(maxPermLimit, extraStorageLimit));
     }
 }

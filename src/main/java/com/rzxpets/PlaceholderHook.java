@@ -141,4 +141,57 @@ public class PlaceholderHook {
             return 0;
         }
     }
+
+    private static net.milkbowl.vault.economy.Economy vaultEconomy = null;
+    private static boolean vaultChecked = false;
+
+    public static net.milkbowl.vault.economy.Economy getVaultEconomy() {
+        if (!vaultChecked || vaultEconomy == null) {
+            vaultChecked = true;
+            if (Bukkit.getPluginManager().isPluginEnabled("Vault")) {
+                org.bukkit.plugin.RegisteredServiceProvider<net.milkbowl.vault.economy.Economy> rsp =
+                        Bukkit.getServicesManager().getRegistration(net.milkbowl.vault.economy.Economy.class);
+                if (rsp != null) {
+                    vaultEconomy = rsp.getProvider();
+                }
+            }
+        }
+        return vaultEconomy;
+    }
+
+    public static double getVaultBalance(Player player) {
+        net.milkbowl.vault.economy.Economy eco = getVaultEconomy();
+        if (eco != null && player != null) {
+            try {
+                return eco.getBalance(player);
+            } catch (Throwable t) {
+                return 0.0;
+            }
+        }
+        return 0.0;
+    }
+
+    public static boolean withdrawVault(Player player, double amount) {
+        net.milkbowl.vault.economy.Economy eco = getVaultEconomy();
+        if (eco != null && player != null) {
+            try {
+                return eco.withdrawPlayer(player, amount).transactionSuccess();
+            } catch (Throwable t) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    public static boolean depositVault(Player player, double amount) {
+        net.milkbowl.vault.economy.Economy eco = getVaultEconomy();
+        if (eco != null && player != null) {
+            try {
+                return eco.depositPlayer(player, amount).transactionSuccess();
+            } catch (Throwable t) {
+                return false;
+            }
+        }
+        return false;
+    }
 }

@@ -1,0 +1,70 @@
+[
+  {
+    "version": "v1.0.2",
+    "timestamp": "2026-11-03 06:55",
+    "author": "AI Assistant",
+    "why": "Resolved critical block-break item duplication exploit, fixed player cursor inventory item deletion, removed hard dependency on RZXCore for standalone execution, eliminated ghost entity world chunk leaks, added database rollback safety with extra storage limit persistence, integrated Vault economy payments, and modernized multi-version Particle and Attribute compatibility.",
+    "files": [
+      {
+        "status": "MODIFIED",
+        "path": "src/main/java/com/rzxpets/EventListener.java",
+        "details": "Fixed block break dupe exploit with ignoreCancelled check, protected legitimate player cursor items from deletion, and integrated Vault economy deductions"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "src/main/java/com/rzxpets/ShopGui.java",
+        "details": "Implemented isGuiItem check to prevent deleting non-GUI items from player cursor on menu interactions"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "src/main/java/com/rzxpets/PetManager.java",
+        "details": "Set entities non-persistent to eliminate world chunk leaks, added rzxpets_entity scoreboard tag, cleaned up ghost pets, and throttled WorldGuard region checks"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "src/main/java/com/rzxpets/PetMechanic.java",
+        "details": "Added multi-version safe particle resolution (VILLAGER_HAPPY / HAPPY_VILLAGER) and dynamic Max Health attribute lookup"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "src/main/java/com/rzxpets/DataManager.java",
+        "details": "Added database transaction rollback safety and added extra_storage_limit persistence"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "src/main/java/com/rzxpets/PlayerData.java",
+        "details": "Added extraStorageLimit field with database-backed storage expansion fallback for non-LuckPerms servers"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "src/main/java/com/rzxpets/PlaceholderHook.java",
+        "details": "Added Vault Economy provider hooks for balance checks, withdrawals, and deposits"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "src/main/java/com/rzxpets/RZXPets.java",
+        "details": "Converted RZXCore to optional soft-dependency for standalone operation, and restored configurable premium edition loading"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "src/main/resources/plugin.yml",
+        "details": "Moved RZXCore to softdepend and added Vault"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "src/main/resources/config.yml",
+        "details": "Restored edition.premium configuration block"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "pom.xml",
+        "details": "Added JitPack repository and VaultAPI dependency"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "README.md",
+        "details": "Updated documentation regarding standalone operation without RZXCore"
+      }
+    ]
+  }
+]

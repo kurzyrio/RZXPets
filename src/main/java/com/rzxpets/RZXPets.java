@@ -105,21 +105,20 @@ public class RZXPets extends JavaPlugin implements RZXPlugin, CommandExecutor {
     }
 
     private boolean validateEnvironment() {
-        // 1. RZXCore Presence & State Check
-        if (!Bukkit.getPluginManager().isPluginEnabled("RZXCore")) {
-            RZXLoggerService.fatal("RZXCore dependency is missing or disabled! RZXPets requires RZXCore to be active.");
-            return false;
+        // 1. RZXCore Presence & State Check (Optional soft-dependency)
+        if (Bukkit.getPluginManager().isPluginEnabled("RZXCore")) {
+            org.bukkit.plugin.Plugin rzxCore = Bukkit.getPluginManager().getPlugin("RZXCore");
+            if (rzxCore != null && !rzxCore.getDescription().getVersion().startsWith("1.")) {
+                String ver = rzxCore.getDescription().getVersion();
+                RZXLoggerService.warning("Incompatible RZXCore API version found: " + ver + "! Expected major version 1.x.x.");
+            } else {
+                RZXLoggerService.success("RZXCore detected and operational.");
+            }
+        } else {
+            RZXLoggerService.info("RZXCore not installed - RZXPets is operating cleanly in standalone mode.");
         }
 
-        // 2. RZXCore API Version Compatibility Check
-        org.bukkit.plugin.Plugin rzxCore = Bukkit.getPluginManager().getPlugin("RZXCore");
-        if (rzxCore == null || !rzxCore.getDescription().getVersion().startsWith("1.")) {
-            String ver = rzxCore != null ? rzxCore.getDescription().getVersion() : "Unknown";
-            RZXLoggerService.fatal("Incompatible RZXCore API version found: " + ver + "! Expected major version 1.x.x.");
-            return false;
-        }
-
-        // 3. Java Version Validation (Java 17+)
+        // 2. Java Version Validation (Java 17+)
         String javaVersionStr = System.getProperty("java.version");
         int majorJavaVersion = parseJavaVersion(javaVersionStr);
         if (majorJavaVersion < 17) {
@@ -437,7 +436,7 @@ public class RZXPets extends JavaPlugin implements RZXPlugin, CommandExecutor {
         if (isPremium) {
             RZXLoggerService.success("★ RZXPets Premium Edition Active: UNLIMITED Pets & Mechanics loaded!");
         } else {
-            RZXLoggerService.warning("⚠ RZXPets Standard Edition Active: Enforcing Max " + maxPets + " Pets and Max " + maxMechanics + " Mechanics limits. Upgrade to Premium for UNLIMITED!");
+            RZXLoggerService.warning("⚠ RZXPets Standard Edition Active: Enforcing limits (Max " + maxPets + " Pets, Max " + maxMechanics + " Mechanics). Set edition.premium to true in config.yml for UNLIMITED!");
         }
 
         File petsFolder = new File(getDataFolder(), "pets");

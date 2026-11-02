@@ -20,6 +20,8 @@ public class PetManager {
     private final Map<UUID, AttackAnimation> activeAnimations;
     private final Map<UUID, Long> combatCooldowns;
     private final Map<UUID, Long> lastSpawnAttempt;
+    private final Map<UUID, Boolean> regionAllowedCache;
+    private final Map<UUID, Long> lastRegionCheck;
     private boolean tasksStarted = false;
 
     public PetManager(RZXPets plugin) {
@@ -28,6 +30,8 @@ public class PetManager {
         this.activeAnimations = new HashMap<>();
         this.combatCooldowns = new HashMap<>();
         this.lastSpawnAttempt = new HashMap<>();
+        this.regionAllowedCache = new HashMap<>();
+        this.lastRegionCheck = new HashMap<>();
     }
 
     public void startTasks() {
@@ -46,6 +50,10 @@ public class PetManager {
             for (Entity entity : world.getEntities()) {
                 if (entity instanceof ArmorStand) {
                     if (entity.getScoreboardTags().contains("rzxpets_nameplate") || "Armor Stand".equals(entity.getCustomName())) {
+                        entity.remove();
+                    }
+                } else if (entity.getScoreboardTags().contains("rzxpets_entity")) {
+                    if (!activeEntities.containsValue(entity)) {
                         entity.remove();
                     }
                 }
@@ -94,7 +102,8 @@ public class PetManager {
         }
 
         if (pet != null) {
-            pet.setPersistent(true);
+            pet.setPersistent(false);
+            pet.addScoreboardTag("rzxpets_entity");
             pet.setGravity(false); // Float/hover at shoulder height
             pet.setInvulnerable(true);
             pet.setSilent(true);
@@ -211,6 +220,10 @@ public class PetManager {
             pet.remove();
         }
         activeAnimations.remove(uuid);
+        combatCooldowns.remove(uuid);
+        lastSpawnAttempt.remove(uuid);
+        regionAllowedCache.remove(uuid);
+        lastRegionCheck.remove(uuid);
 
         // Clean up creative flight capability when companion is unequipped
         if (player.getGameMode() != org.bukkit.GameMode.CREATIVE && player.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
@@ -242,7 +255,18 @@ public class PetManager {
                         PetType petType = PetType.getById(activeId);
                         if (petType == null) continue;
 
-                        if (!plugin.arePetsAllowedAt(player)) {
+                        long now = System.currentTimeMillis();
+                        long lastRegCheck = lastRegionCheck.getOrDefault(uuid, 0L);
+                        boolean allowed;
+                        if (now - lastRegCheck > 500L) { // Throttle WorldGuard query to every 500ms (10 ticks)
+                            lastRegionCheck.put(uuid, now);
+                            allowed = plugin.arePetsAllowedAt(player);
+                            regionAllowedCache.put(uuid, allowed);
+                        } else {
+                            allowed = regionAllowedCache.getOrDefault(uuid, true);
+                        }
+
+                        if (!allowed) {
                             despawnPet(player);
                             String blockedMsg = plugin.getHooksConfig().getString("worldguard.messages.summon-blocked", "&c&l[RZXPets] &cYou cannot summon pets in this region!");
                             player.sendMessage(PlaceholderHook.color(blockedMsg));
@@ -253,7 +277,6 @@ public class PetManager {
                         // Auto-respawn invalidated or unspawned entities
                         if (pet == null || !pet.isValid()) {
                             if (player.isOnline() && !player.isDead()) {
-                                long now = System.currentTimeMillis();
                                 long lastAttempt = lastSpawnAttempt.getOrDefault(uuid, 0L);
                                 if (now - lastAttempt > 5000L) { // 5-second cooldown
                                     lastSpawnAttempt.put(uuid, now);
@@ -361,9 +384,7 @@ public class PetManager {
                                 activeAnimations.remove(uuid);
                                 double distance = targetLoc.distance(pet.getLocation());
                                 double maxDist = plugin.getConfig().getDouble("follow.teleport-distance", 15.0);
-                                if (distance > maxDist) {
-                                    pet.teleport(targetLoc);
-                                } else {
+                                if (distance > maxDist || distance > 0.05) {
                                     pet.teleport(targetLoc);
                                 }
                             }

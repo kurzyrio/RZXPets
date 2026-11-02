@@ -22,38 +22,40 @@ public class ShopGui {
         this.plugin = plugin;
     }
 
-    public void sanitizePlayerInventory(Player player) {
-        if (player == null || !player.isOnline()) return;
+    public static boolean isGuiItem(RZXPets plugin, ItemStack item) {
+        if (item == null || item.getType() == Material.AIR || !item.hasItemMeta()) return false;
         NamespacedKey actionKey = new NamespacedKey(plugin, "action");
         NamespacedKey priceKey = new NamespacedKey(plugin, "price");
         NamespacedKey currencyKey = new NamespacedKey(plugin, "currency");
+        var container = item.getItemMeta().getPersistentDataContainer();
+        if (container.has(actionKey, PersistentDataType.STRING) ||
+            container.has(priceKey, PersistentDataType.INTEGER) ||
+            container.has(currencyKey, PersistentDataType.STRING)) {
+            return true;
+        }
+        if (item.getItemMeta().hasLore() && item.getItemMeta().getLore() != null) {
+            for (String line : item.getItemMeta().getLore()) {
+                if (line.contains("Companion Skills:") || line.contains("Click to summon pet") || line.contains("Click to dismiss pet") || line.contains("ALREADY ADOPTED")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
+    public void sanitizePlayerInventory(Player player) {
+        if (player == null || !player.isOnline()) return;
         boolean modified = false;
         ItemStack[] contents = player.getInventory().getContents();
         for (int i = 0; i < contents.length; i++) {
-            ItemStack item = contents[i];
-            if (item != null && item.hasItemMeta()) {
-                PersistentDataType<String, String> stringType = PersistentDataType.STRING;
-                PersistentDataType<Integer, Integer> intType = PersistentDataType.INTEGER;
-                var container = item.getItemMeta().getPersistentDataContainer();
-                boolean isGuiItem = container.has(actionKey, stringType) ||
-                                    container.has(priceKey, intType) ||
-                                    container.has(currencyKey, stringType);
-
-                if (!isGuiItem && item.getItemMeta().hasLore()) {
-                    for (String line : item.getItemMeta().getLore()) {
-                        if (line.contains("Companion Skills:") || line.contains("Click to summon pet") || line.contains("Click to dismiss pet") || line.contains("ALREADY ADOPTED")) {
-                            isGuiItem = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (isGuiItem) {
-                    contents[i] = null;
-                    modified = true;
-                }
+            if (isGuiItem(plugin, contents[i])) {
+                contents[i] = null;
+                modified = true;
             }
+        }
+        if (isGuiItem(plugin, player.getItemOnCursor())) {
+            player.setItemOnCursor(null);
+            modified = true;
         }
         if (modified) {
             player.getInventory().setContents(contents);
@@ -62,7 +64,9 @@ public class ShopGui {
     }
 
     public void openMenu(Player player, String sectionName) {
-        player.setItemOnCursor(null);
+        if (isGuiItem(plugin, player.getItemOnCursor())) {
+            player.setItemOnCursor(null);
+        }
         sanitizePlayerInventory(player);
 
         File file = new File(plugin.getDataFolder(), "shop/sections/" + sectionName + ".yml");
@@ -268,7 +272,9 @@ public class ShopGui {
      * and allowing them to summon/dismiss them on click.
      */
     public void openStorageMenu(Player player) {
-        player.setItemOnCursor(null);
+        if (isGuiItem(plugin, player.getItemOnCursor())) {
+            player.setItemOnCursor(null);
+        }
         sanitizePlayerInventory(player);
 
         PlayerData playerData = plugin.getPlayerData(player.getUniqueId());
@@ -405,7 +411,9 @@ public class ShopGui {
     }
 
     public void openUpgradeSelectPetMenu(Player player) {
-        player.setItemOnCursor(null);
+        if (isGuiItem(plugin, player.getItemOnCursor())) {
+            player.setItemOnCursor(null);
+        }
         sanitizePlayerInventory(player);
 
         PlayerData playerData = plugin.getPlayerData(player.getUniqueId());
@@ -531,7 +539,9 @@ public class ShopGui {
     }
 
     public void openPetUpgradeDetailMenu(Player player, String petId) {
-        player.setItemOnCursor(null);
+        if (isGuiItem(plugin, player.getItemOnCursor())) {
+            player.setItemOnCursor(null);
+        }
         sanitizePlayerInventory(player);
 
         PlayerData playerData = plugin.getPlayerData(player.getUniqueId());

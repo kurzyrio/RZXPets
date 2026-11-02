@@ -69,7 +69,8 @@ public class DataManager {
                     "uuid VARCHAR(36) PRIMARY KEY, " +
                     "active_pet VARCHAR(64), " +
                     "playtime_seconds INT DEFAULT 0, " +
-                    "afk_playtime_seconds INT DEFAULT 0" +
+                    "afk_playtime_seconds INT DEFAULT 0, " +
+                    "extra_storage_limit INT DEFAULT 0" +
                     ")");
 
             // Create player pets table with name column
@@ -85,6 +86,13 @@ public class DataManager {
             // Migration check: add custom name column dynamically if migrating from an existing table
             try {
                 stmt.execute("ALTER TABLE rzxpets_player_pets ADD COLUMN name VARCHAR(128) DEFAULT NULL");
+            } catch (SQLException ignored) {
+                // Column already exists
+            }
+
+            // Migration check: add extra_storage_limit column dynamically if migrating from an existing table
+            try {
+                stmt.execute("ALTER TABLE rzxpets_players ADD COLUMN extra_storage_limit INT DEFAULT 0");
             } catch (SQLException ignored) {
                 // Column already exists
             }
@@ -109,6 +117,9 @@ public class DataManager {
                         }
                         data.setPlaytimeSeconds(rs.getInt("playtime_seconds"));
                         data.setAfkPlaytimeSeconds(rs.getInt("afk_playtime_seconds"));
+                        try {
+                            data.setExtraStorageLimit(rs.getInt("extra_storage_limit"));
+                        } catch (SQLException ignored) {}
                     } else {
                         // Migration Check: If legacy YAML exists, load and save to SQL
                         File file = new File(dataFolder, uuid.toString() + ".yml");
@@ -169,19 +180,23 @@ public class DataManager {
     }
 
     public void savePlayerData(PlayerData data) {
-        try (Connection conn = getConnection()) {
+        Connection conn = null;
+        try {
+            conn = getConnection();
             conn.setAutoCommit(false);
             
             String type = plugin.getConfig().getString("database.type", "SQLite").toUpperCase();
             String playerSql;
             if (type.equals("MYSQL")) {
-                playerSql = "INSERT INTO rzxpets_players (uuid, active_pet, playtime_seconds, afk_playtime_seconds) " +
-                            "VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE " +
-                            "active_pet = VALUES(active_pet), playtime_seconds = VALUES(playtime_seconds), afk_playtime_seconds = VALUES(afk_playtime_seconds)";
+                playerSql = "INSERT INTO rzxpets_players (uuid, active_pet, playtime_seconds, afk_playtime_seconds, extra_storage_limit) " +
+                            "VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE " +
+                            "active_pet = VALUES(active_pet), playtime_seconds = VALUES(playtime_seconds), " +
+                            "afk_playtime_seconds = VALUES(afk_playtime_seconds), extra_storage_limit = VALUES(extra_storage_limit)";
             } else {
-                playerSql = "INSERT INTO rzxpets_players (uuid, active_pet, playtime_seconds, afk_playtime_seconds) " +
-                            "VALUES (?, ?, ?, ?) ON CONFLICT(uuid) DO UPDATE SET " +
-                            "active_pet = excluded.active_pet, playtime_seconds = excluded.playtime_seconds, afk_playtime_seconds = excluded.afk_playtime_seconds";
+                playerSql = "INSERT INTO rzxpets_players (uuid, active_pet, playtime_seconds, afk_playtime_seconds, extra_storage_limit) " +
+                            "VALUES (?, ?, ?, ?, ?) ON CONFLICT(uuid) DO UPDATE SET " +
+                            "active_pet = excluded.active_pet, playtime_seconds = excluded.playtime_seconds, " +
+                            "afk_playtime_seconds = excluded.afk_playtime_seconds, extra_storage_limit = excluded.extra_storage_limit";
             }
             
             try (PreparedStatement ps = conn.prepareStatement(playerSql)) {
@@ -189,6 +204,7 @@ public class DataManager {
                 ps.setString(2, data.getActivePet());
                 ps.setInt(3, data.getPlaytimeSeconds());
                 ps.setInt(4, data.getAfkPlaytimeSeconds());
+                ps.setInt(5, data.getExtraStorageLimit());
                 ps.executeUpdate();
             }
 
@@ -221,6 +237,17 @@ public class DataManager {
             conn.commit();
         } catch (SQLException e) {
             com.rzxpets.rzx.RZXLoggerService.error("Could not save player data for UUID: " + data.getUuid(), e);
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ignored) {}
+            }
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                } catch (SQLException ignored) {}
+            }
         }
     }
 

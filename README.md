@@ -44,7 +44,7 @@
 
 ## 🛠️ Requirements & Integrations
 
-*   **RZXCore** (Required central framework dependency)
+*   **RZXCore** (Supported central network framework; operates cleanly in standalone mode if absent)
 *   **Spigot / Paper 1.20.4+**
 *   **PlaceholderAPI** (Required for balance rendering and hooks)
 *   **Any Economy/Currency Plugin** (Supports Vault economies, custom items, or local zGems currency)

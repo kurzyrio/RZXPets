@@ -101,8 +101,11 @@ public class EventListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
         Player player = event.getPlayer();
         Block block = event.getBlock();
         Material material = block.getType();
@@ -235,39 +238,8 @@ public class EventListener implements Listener {
     }
 
     public void sanitizePlayerInventory(Player player) {
-        if (player == null || !player.isOnline()) return;
-        NamespacedKey actionKey = new NamespacedKey(plugin, "action");
-        NamespacedKey priceKey = new NamespacedKey(plugin, "price");
-        NamespacedKey currencyKey = new NamespacedKey(plugin, "currency");
-
-        boolean modified = false;
-        ItemStack[] contents = player.getInventory().getContents();
-        for (int i = 0; i < contents.length; i++) {
-            ItemStack item = contents[i];
-            if (item != null && item.hasItemMeta()) {
-                org.bukkit.persistence.PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
-                boolean isGuiItem = container.has(actionKey, PersistentDataType.STRING) ||
-                                    container.has(priceKey, PersistentDataType.INTEGER) ||
-                                    container.has(currencyKey, PersistentDataType.STRING);
-
-                if (!isGuiItem && item.getItemMeta().hasLore()) {
-                    for (String line : item.getItemMeta().getLore()) {
-                        if (line.contains("Companion Skills:") || line.contains("Click to summon pet") || line.contains("Click to dismiss pet") || line.contains("ALREADY ADOPTED")) {
-                            isGuiItem = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (isGuiItem) {
-                    contents[i] = null;
-                    modified = true;
-                }
-            }
-        }
-        if (modified) {
-            player.getInventory().setContents(contents);
-            player.updateInventory();
+        if (plugin.getShopGui() != null) {
+            plugin.getShopGui().sanitizePlayerInventory(player);
         }
     }
 
@@ -298,7 +270,9 @@ public class EventListener implements Listener {
         if (isCustomGui(event.getView())) {
             event.setCancelled(true);
             if (event.getWhoClicked() instanceof Player player) {
-                player.setItemOnCursor(null);
+                if (ShopGui.isGuiItem(plugin, player.getItemOnCursor())) {
+                    player.setItemOnCursor(null);
+                }
                 sanitizePlayerInventory(player);
                 plugin.getServer().getScheduler().runTask(plugin, player::updateInventory);
             }
@@ -309,7 +283,9 @@ public class EventListener implements Listener {
     public void onInventoryClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
         if (isCustomGui(event.getView())) {
             if (event.getPlayer() instanceof Player player) {
-                player.setItemOnCursor(null);
+                if (ShopGui.isGuiItem(plugin, player.getItemOnCursor())) {
+                    player.setItemOnCursor(null);
+                }
                 sanitizePlayerInventory(player);
                 plugin.getServer().getScheduler().runTask(plugin, player::updateInventory);
             }
@@ -334,9 +310,11 @@ public class EventListener implements Listener {
 
         Player player = (Player) event.getWhoClicked();
 
-        // Immediately clear cursor item to prevent double-click or hotbar-swap collecting GUI items into cursor
+        // Only clear cursor item if it is actually a leaked custom GUI button!
         if (player.getItemOnCursor() != null && player.getItemOnCursor().getType() != Material.AIR) {
-            player.setItemOnCursor(null);
+            if (ShopGui.isGuiItem(plugin, player.getItemOnCursor())) {
+                player.setItemOnCursor(null);
+            }
         }
 
         // Purge any leaked GUI items from player inventory
@@ -438,9 +416,20 @@ public class EventListener implements Listener {
 
             // Deduct ExcellentEconomy currency silently
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "zgems take " + player.getName() + " " + price + " -s");
-        }
-
-        if (price > 0 && "item".equalsIgnoreCase(currency)) {
+        } else if (price > 0 && ("vault".equalsIgnoreCase(currency) || "money".equalsIgnoreCase(currency) || "economy".equalsIgnoreCase(currency) || "eco".equalsIgnoreCase(currency))) {
+            if (PlaceholderHook.getVaultEconomy() == null) {
+                player.sendMessage(PlaceholderHook.color("&cVault economy plugin is not installed or enabled."));
+                return;
+            }
+            if (PlaceholderHook.getVaultBalance(player) < price) {
+                player.sendMessage(PlaceholderHook.color("&cYou do not have enough money! (Need " + price + " " + PlaceholderHook.getVaultEconomy().currencyNamePlural() + ")"));
+                return;
+            }
+            if (!PlaceholderHook.withdrawVault(player, price)) {
+                player.sendMessage(PlaceholderHook.color("&cPayment transaction failed. Please try again."));
+                return;
+            }
+        } else if (price > 0 && "item".equalsIgnoreCase(currency)) {
             NamespacedKey itemIdKey = new NamespacedKey(plugin, "item_id");
             String itemId = clickedItem.getItemMeta().getPersistentDataContainer().getOrDefault(itemIdKey, PersistentDataType.STRING, "");
             if (itemId.isEmpty()) {
@@ -459,6 +448,9 @@ public class EventListener implements Listener {
             }
 
             takeItem(player, itemId, price);
+        } else if (price > 0 && !"free".equalsIgnoreCase(currency)) {
+            player.sendMessage(PlaceholderHook.color("&cUnsupported currency type: " + currency));
+            return;
         }
 
         // Execute action
@@ -521,15 +513,25 @@ public class EventListener implements Listener {
                     break;
                 }
                 int cost = 50 + (currentLevel * 15);
-                double balance = PlaceholderHook.getExcellentEconomyBalance(player, "zgems");
-                if (balance < cost) {
-                    player.sendMessage(PlaceholderHook.color("&c&l[RZXPets] &cYou do not have enough zGems! (Need " + cost + " zGems)"));
+                double zBalance = PlaceholderHook.getExcellentEconomyBalance(player, "zgems");
+                boolean useVault = false;
+                if (zBalance < cost && PlaceholderHook.getVaultEconomy() != null) {
+                    if (PlaceholderHook.getVaultBalance(player) >= cost) {
+                        useVault = true;
+                    }
+                }
+                if (zBalance < cost && !useVault) {
+                    player.sendMessage(PlaceholderHook.color("&c&l[RZXPets] &cYou do not have enough zGems or money! (Need " + cost + " zGems)"));
                     break;
                 }
                 
                 if (petData != null) {
                     // Deduct cost
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "zgems take " + player.getName() + " " + cost + " -s");
+                    if (useVault) {
+                        PlaceholderHook.withdrawVault(player, cost);
+                    } else {
+                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "zgems take " + player.getName() + " " + cost + " -s");
+                    }
                     
                     int nextLvl = petData.getLevel() + 1;
                     petData.setLevel(nextLvl);
@@ -538,7 +540,7 @@ public class EventListener implements Listener {
                     PetType type = PetType.getById(petId);
                     String displayName = type != null ? type.getDisplayName() : petId;
                     player.sendMessage(PlaceholderHook.color("&a&l[RZXPets] &aYour " + displayName + " &apet leveled up to &b&l" + nextLvl + "&a!"));
-                    com.rzxpets.rzx.RZXAuditService.log(player.getName(), "Upgraded pet " + petId + " to level " + nextLvl + " (Cost: " + cost + " zGems)");
+                    com.rzxpets.rzx.RZXAuditService.log(player.getName(), "Upgraded pet " + petId + " to level " + nextLvl + " (Cost: " + cost + (useVault ? " Vault Currency)" : " zGems)"));
                     com.rzxpets.rzx.RZXBus.publish(petData);
                     
                     // Play level up sound (ting)
@@ -565,18 +567,35 @@ public class EventListener implements Listener {
                     break;
                 }
                 
-                double balance = PlaceholderHook.getExcellentEconomyBalance(player, "zgems");
-                if (balance < cost) {
-                    player.sendMessage(PlaceholderHook.color("&c&l[RZXPets] &cYou do not have enough zGems! (Need " + cost + " zGems)"));
+                double zBalance = PlaceholderHook.getExcellentEconomyBalance(player, "zgems");
+                boolean useVault = false;
+                if (zBalance < cost && PlaceholderHook.getVaultEconomy() != null) {
+                    if (PlaceholderHook.getVaultBalance(player) >= cost) {
+                        useVault = true;
+                    }
+                }
+                if (zBalance < cost && !useVault) {
+                    player.sendMessage(PlaceholderHook.color("&c&l[RZXPets] &cYou do not have enough zGems or money! (Need " + cost + " zGems)"));
                     break;
                 }
                 
                 // Deduct cost
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "zgems take " + player.getName() + " " + cost + " -s");
+                if (useVault) {
+                    PlaceholderHook.withdrawVault(player, cost);
+                } else {
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "zgems take " + player.getName() + " " + cost + " -s");
+                }
                 
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "lp user " + player.getName() + " permission set rzxpets.limit." + targetLimit + " true");
+                // Store upgraded limit into database-backed player profile
+                playerData.setExtraStorageLimit(targetLimit);
+                plugin.getDataManager().savePlayerData(playerData);
+
+                // If LuckPerms is active, also sync the permission node
+                if (Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) {
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "lp user " + player.getName() + " permission set rzxpets.limit." + targetLimit + " true");
+                }
                 player.sendMessage(PlaceholderHook.color("&a&l[RZXPets] &aUpgraded! You can now store up to " + targetLimit + " pets."));
-                com.rzxpets.rzx.RZXAuditService.log(player.getName(), "Upgraded storage limit to " + targetLimit + " (Cost: " + cost + " zGems)");
+                com.rzxpets.rzx.RZXAuditService.log(player.getName(), "Upgraded storage limit to " + targetLimit + " (Cost: " + cost + (useVault ? " Vault Currency)" : " zGems)"));
                 
                 // Play level up sound (ting)
                 player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
