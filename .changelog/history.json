@@ -1,5 +1,73 @@
 [
   {
+    "version": "v1.0.3",
+    "timestamp": "2026-11-03 07:22",
+    "author": "AI Assistant",
+    "why": "Cleaned repository of unnecessary local build scripts, temporary files, old walkthrough documentation, and replaced full Maven binary installation with standard portable Maven wrapper",
+    "files": [
+      {
+        "status": "DELETED",
+        "path": "apache-maven-3.9.6",
+        "details": "Removed bundled Maven binaries from repository in favor of standard wrapper"
+      },
+      {
+        "status": "DELETED",
+        "path": "build.ps1",
+        "details": "Removed obsolete manual build script"
+      },
+      {
+        "status": "DELETED",
+        "path": "compile.ps1",
+        "details": "Removed obsolete scratch compile script"
+      },
+      {
+        "status": "DELETED",
+        "path": "dependency-reduced-pom.xml",
+        "details": "Untracked shaded artifact descriptor"
+      },
+      {
+        "status": "DELETED",
+        "path": "walkthrough.md",
+        "details": "Removed scratch walkthrough document"
+      },
+      {
+        "status": "DELETED",
+        "path": "classpath.txt",
+        "details": "Removed temporary javac classpath file"
+      },
+      {
+        "status": "DELETED",
+        "path": "sources.txt",
+        "details": "Removed temporary javac sources list"
+      },
+      {
+        "status": "CREATED",
+        "path": "mvnw",
+        "details": "Added standard Maven wrapper shell script"
+      },
+      {
+        "status": "CREATED",
+        "path": "mvnw.cmd",
+        "details": "Added standard Maven wrapper batch script"
+      },
+      {
+        "status": "CREATED",
+        "path": ".mvn/wrapper/maven-wrapper.properties",
+        "details": "Added Maven wrapper properties"
+      },
+      {
+        "status": "CREATED",
+        "path": "CHANGELOG.md",
+        "details": "Added standardized markdown changelog without emojis"
+      },
+      {
+        "status": "MODIFIED",
+        "path": ".gitignore",
+        "details": "Added apache-maven-*/ pattern"
+      }
+    ]
+  },
+  {
     "version": "v1.0.2",
     "timestamp": "2026-11-03 06:55",
     "author": "AI Assistant",
@@ -64,6 +132,16 @@
         "status": "MODIFIED",
         "path": "README.md",
         "details": "Updated documentation regarding standalone operation without RZXCore"
+      },
+      {
+        "status": "CREATED",
+        "path": "CHANGELOG.md",
+        "details": "Added standardized keep-a-changelog markdown history without emojis"
+      },
+      {
+        "status": "MODIFIED",
+        "path": "RELEASE_NOTES.md",
+        "details": "Updated v1.0.2 release notes without emojis for Modrinth and GitHub release documentation"
       }
     ]
   }
